@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/forhuaweip10_receive.iml" filepath="$PROJECT_DIR$/.idea/modules/forhuaweip10_receive.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.main.iml" filepath="$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/app/forhuaweip10_receive.app.unitTest.iml" />
+    </modules>
+  </component>
+</project>
