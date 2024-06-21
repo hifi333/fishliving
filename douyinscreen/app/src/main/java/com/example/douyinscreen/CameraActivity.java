@@ -43,15 +43,12 @@ public class CameraActivity extends AppCompatActivity {
 
     private static final String TAG = "CameraActivity";
 //    private static final String SERVER_IP = "192.168.0.109"; // 服务器IP地址
-    private static final int SERVER_PORT = 12345; // 服务器端口
+    private static final int SERVER_PORT_piao = 12345; // 服务器端口
     private static final int REQUEST_CAMERA_PERMISSION = 200;
 
     private CameraDevice cameraDevice;
     private CameraCaptureSession cameraCaptureSession;
-//    private MediaCodec mediaCodec;
-//    private MediaCodec zoominPiao_Decocode_mediaCodec2;
-    private Surface encoderSurface;
-    private Surface zoominPiao_surfaceTexture;
+
 
 //    private TextureView textureView;
     private Handler mBackgroundHandler;
@@ -134,12 +131,22 @@ public class CameraActivity extends AppCompatActivity {
 
         //创建一个临时浮动的80% 全屏且在最上面的一个View，展示抓鱼时刻的第一视觉的摄像头（挂在脖子下面那个）
         personView = new TextureView(this);
-        FrameLayout.LayoutParams paramsTextureView3 = new FrameLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
-        rootLayout.addView(personView, paramsTextureView3);
+        FrameLayout.LayoutParams a1  = new FrameLayout.LayoutParams(
+                800,
+                800
+        );
+        a1.leftMargin = 100;
+        a1.topMargin = 500;
+        rootLayout.addView(personView, a1);
 
-        personView.bringToFront();
-        personView.setVisibility(View.GONE);
+//
+//        FrameLayout.LayoutParams paramsTextureView3 = new FrameLayout.LayoutParams(
+//                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
+//
+//        rootLayout.addView(personView, paramsTextureView3);
+
+//        personView.bringToFront();
+//        personView.setVisibility(View.GONE);
 
         // 将 rootLayout 设置为当前 Activity 的内容视图
         setContentView(rootLayout);
@@ -153,10 +160,11 @@ public class CameraActivity extends AppCompatActivity {
         paint.setAntiAlias(true); // 设置抗锯齿
 
 
-
-
         zoominPIaoView.setSurfaceTextureListener(surfaceTextureListener_zoominpiao);
+        personView.setSurfaceTextureListener(surfaceTextureListener_personview);
         bigbackgroundView.setSurfaceTextureListener(surfaceTextureListener_bigbackground);
+
+
 
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
         gestureDetector = new GestureDetector(this, new GestureListener());
@@ -221,8 +229,7 @@ public class CameraActivity extends AppCompatActivity {
     private TextureView.SurfaceTextureListener surfaceTextureListener_bigbackground = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            checkPermissions(); //本地主摄像头， 脖子上第一视角
-
+            checkPermissions();
             // 当SurfaceTexture内容更新时调用
           //  Canvas canvas = bigbackgroundView.lockCanvas();
             //if (canvas != null) {
@@ -230,15 +237,9 @@ public class CameraActivity extends AppCompatActivity {
                // canvas.drawText(text, 0, 0, paint); // 绘制文字
                 //bigbackgroundView.unlockCanvasAndPost(canvas); // 解锁Canvas并提交绘制
            // }
-
         }
-
         @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-
-
-        }
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {}
 
         @Override
         public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
@@ -246,20 +247,19 @@ public class CameraActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-        }
-
-
-
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
     };
 
 
-    private TextureView.SurfaceTextureListener surfaceTextureListener_zoominpiao = new TextureView.SurfaceTextureListener() {
+    private TextureView.SurfaceTextureListener surfaceTextureListener_personview = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-            zoominPiao_initMediaCodec2_fromRemoteSocket(surface);  //远程来的数据，解码器后，绑定到这个view
-
+            try {
+                ////远程来的数据，解码器后，绑定到这个view
+                start_personview_ServerSocket( new Surface(surface));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
@@ -273,6 +273,33 @@ public class CameraActivity extends AppCompatActivity {
         @Override
         public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
     };
+
+
+
+    private TextureView.SurfaceTextureListener surfaceTextureListener_zoominpiao = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+            try {
+                ////远程来的数据，解码器后，绑定到这个view
+                start_ZoominPiao_ServerSocket(new Surface(surface));
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {}
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+            return false;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
+    };
+
 
     private void checkPermissions() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
@@ -360,8 +387,6 @@ public class CameraActivity extends AppCompatActivity {
             assert texture1 != null;
             texture1.setDefaultBufferSize(400, 600); // 设置预览大小
             Surface bigbackgroundSurface = new Surface(texture1);
-
-
 
             CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             captureBuilder.addTarget(bigbackgroundSurface);
@@ -483,55 +508,11 @@ public class CameraActivity extends AppCompatActivity {
 //        }
     }
 
-    private void zoominPiao_initMediaCodec2_fromRemoteSocket(SurfaceTexture surfaceTexture) {
-        try {
-
-            /*
-            zoominPiao_Decocode_mediaCodec2 = MediaCodec.createDecoderByType("video/avc");
-            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
-
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-//            format.setInteger(MediaFormat.KEY_BIT_RATE, 5000000); // 5 Mbps
-//            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-//            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1); // I帧间隔1秒
-
-            format.setInteger(MediaFormat.KEY_ROTATION, 90); //图像右转90度
-
-            zoominPiao_Decocode_mediaCodec2.configure(format, new Surface(surfaceTexture), null, 0);
-//            zoominPiao_Decocode_mediaCodec2.start(); //需要在同一个线程里，初始化，和后面的日常使用。
-
-            // 设置 TextureView 的旋转
-//            Matrix matrix = new Matrix();
-//            matrix.postRotate(90);
-//            zoominPIaoView.setTransform(matrix);
-
-*/
-
-            zoominPiao_surfaceTexture =  new Surface(surfaceTexture);
-            startServerSocket();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-private void startServerSocket() {
-//    new Thread(() -> {
-//        while(true) {
-//            try {
-//                serverSocket = new ServerSocket(SERVER_PORT);
-//                Socket clientSocket = serverSocket.accept(); //异步这里，同时接收多个client 连接。
-//                new Thread(() -> {
-//                     newThread_processOneClientConnection(clientSocket);
-//                }).start();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//    }).start();
 
 
-    new ZoominPiao_ClientHandler().start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
+private void start_ZoominPiao_ServerSocket(Surface surface) {
+
+    new ZoominPiao_ClientHandler(surface,true).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
     //整个线程里初始化私有的解码器，避免解码器遇到多线程问题。 另外从解码器里申请一个InputbufferIndex，
     // dequeueInputBuffer（放收到的视频数据进去），此时需要设定timeout时间，可以避免线程block住导致画面block住
     //整个线程应该长期运行在：  at java.net.SocketInputStream.read
@@ -548,33 +529,56 @@ private void startServerSocket() {
 }
 
 
-    private ArrayList  clientthreads  =new ArrayList();
+    private void start_personview_ServerSocket(Surface surface) {
+
+        new ZoominPiao_ClientHandler(surface,false).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
+        //整个线程里初始化私有的解码器，避免解码器遇到多线程问题。 另外从解码器里申请一个InputbufferIndex，
+        // dequeueInputBuffer（放收到的视频数据进去），此时需要设定timeout时间，可以避免线程block住导致画面block住
+        //整个线程应该长期运行在：  at java.net.SocketInputStream.read
+
+        try {
+            Thread.sleep(2000);
+        }catch (Exception ee) {ee.printStackTrace();}
+
+        //启动这个线程， 持续的监听这个端口，等待一个特定的业务client，就是放大漂的视频数据，
+        //用线程来监听，而不是一次性的， 是为了放大漂的client 会启动/关闭，重复连接。
+        new Thread(new persionview_ServerRunnable()).start(); //一个接收TCP端口为12345对应zoominpiao的client 的连接线程。收到连接就交给别人处理，
+
+
+    }
+
+
     private Socket zoominPiaoClientSocket = null;
+    private Socket personviewClientSocket = null;
     private class ZoominPiao_ServerRunnable implements Runnable {
+        private int thisserverport =12345;
+
         @Override
         public void run() {
-            try (ServerSocket serverSocket = new ServerSocket(SERVER_PORT)) {
+            try (ServerSocket serverSocket = new ServerSocket(thisserverport)) {
+                System.out.println("Server startup with port:" + thisserverport);
                 while (true) {
                     Socket socket = serverSocket.accept();
                     zoominPiaoClientSocket = socket;
-                    Log.d(TAG, "New client connected");
-                    //创建一个新线程来处理这个客户端, 如何相同的piaoclient 重复连接，之前那个连接会发送异常，导致对应的处理线程提前退出。
+                    Log.d(TAG, "New client connected for : " + thisserverport);
+                }
+            } catch (IOException ex) {
+                Log.e(TAG, "Server exception: " + ex.getMessage(), ex);
+            }
+        }
+    }
 
-                    //如何其他手机同时启动piaoApp，来连接这个，就会发送多个piao处理线程并发，出现问题！！！！ 如何避免呢
+    private class persionview_ServerRunnable implements Runnable {
+        private int thisserverport =12346;
 
-
-//                    //clean 之前的zoompiaoclient 处理线程
-//                    for(int i=0;i<clientthreads.size();i++){
-//                        ZoominPiao_ClientHandler a =  (ZoominPiao_ClientHandler)clientthreads.get(i);
-//                        a.isrunning = false; //强迫之前的全部退出。 我们这里的zoominpiao的解码器只能同时服务一个client
-//                    }
-//
-//
-//                    ZoominPiao_ClientHandler dd = new ZoominPiao_ClientHandler(socket);
-//                    dd.start();
-//                    clientthreads.add(dd);
-
-
+        @Override
+        public void run() {
+            try (ServerSocket serverSocket = new ServerSocket(thisserverport)) {
+                System.out.println("Server startup with port:" + thisserverport);
+                while (true) {
+                    Socket socket = serverSocket.accept();
+                    personviewClientSocket = socket;
+                    Log.d(TAG, "persionview New client connected for : " + thisserverport);
                 }
             } catch (IOException ex) {
                 Log.e(TAG, "Server exception: " + ex.getMessage(), ex);
@@ -583,17 +587,14 @@ private void startServerSocket() {
     }
 
     private class ZoominPiao_ClientHandler extends Thread {
-//        private Socket socket;
-//        public boolean isrunning =true;
-        private MediaCodec zoominPiao_Decocode_mediaCodec2;
-
-
+        private MediaCodec xDecocode_mediaCodec2;
+        private Surface thisSurfaceTexture;
+        private boolean thisisPiaoNotPersonView = true;
         public void initStartEncoder(){
 
             try {
-                zoominPiao_Decocode_mediaCodec2 = MediaCodec.createDecoderByType("video/avc");
+                xDecocode_mediaCodec2 = MediaCodec.createDecoderByType("video/avc");
                 MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
-
                 format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 //            format.setInteger(MediaFormat.KEY_BIT_RATE, 5000000); // 5 Mbps
 //            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
@@ -601,11 +602,11 @@ private void startServerSocket() {
 
                 format.setInteger(MediaFormat.KEY_ROTATION, 90); //图像右转90度
 
-                if(zoominPiao_surfaceTexture==null) {
+                if(thisSurfaceTexture==null) {
                     System.out.println("zoominPiao_surfaceTexture is null");
                 }
-                zoominPiao_Decocode_mediaCodec2.configure(format, zoominPiao_surfaceTexture, null, 0);
-                zoominPiao_Decocode_mediaCodec2.start(); //需要在同一个线程里，初始化，和后面的日常使用。
+                xDecocode_mediaCodec2.configure(format, thisSurfaceTexture, null, 0);
+                xDecocode_mediaCodec2.start(); //需要在同一个线程里，初始化，和后面的日常使用。
 
                 // 设置 TextureView 的旋转
 //            Matrix matrix = new Matrix();
@@ -617,17 +618,11 @@ private void startServerSocket() {
             }
         }
 
-        public void releaseEncoder(){
-            if (zoominPiao_Decocode_mediaCodec2 != null) {
+        public void releaseEncoder(){ //这个方法有问题，需要解决
+            if (xDecocode_mediaCodec2 != null) {
                 try {
                    // zoominPiao_Decocode_mediaCodec2.stop();
 //                    zoominPiao_Decocode_mediaCodec2.release();
-                    zoominPiao_Decocode_mediaCodec2.reset();
-                    MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
-                    format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-                    format.setInteger(MediaFormat.KEY_ROTATION, 90); //图像右转90度
-                    zoominPiao_Decocode_mediaCodec2.configure(format, zoominPiao_surfaceTexture, null, 0);
-                    zoominPiao_Decocode_mediaCodec2.start();
                     System.out.println("releaseEncoder released");
                 } catch (IllegalStateException e) {
                     e.printStackTrace();
@@ -636,8 +631,9 @@ private void startServerSocket() {
                 System.out.println("in releaseEncoder");
             }
         }
-        public ZoominPiao_ClientHandler() {
-
+        public ZoominPiao_ClientHandler(Surface surfaceTexture,boolean isPiaoNotPersonView) {
+            thisisPiaoNotPersonView = isPiaoNotPersonView;
+            thisSurfaceTexture = surfaceTexture;
             this.setName("fish_ZoominPiao_ClientHandler");
 
             initStartEncoder();
@@ -649,20 +645,25 @@ private void startServerSocket() {
             byte[] tcpbuffer = new byte[65536]; //65K空间,且这个不能很大，网卡接收不住，存储不下1帧的图像数据（400KB 到 5M）， 所以每次读取的数据只能是一帧的部分数据啊。 且里面最多有N帧数据， N-2个帧的完整数据，头尾都是帧的部分数据 也就是说里面包括n-2个帧的开头标记！
             byte[] tobeHandPartImageBuffer = new byte[6553600];//6.5M, 大于 一帧的数据上限要求. 存储在本地的一帧数据的部分，等凑满一帧后，才处理。 啥时候凑满呢，答： 遇到下一帧的开头标记
             int tobeHandPartImageBuffer_len = 0;
+            Socket thisSocket = null;
 
             int framestartflaglen= 8;
             while (true) {
 
-                if(zoominPiaoClientSocket == null){  //当前没有可用的连接， 就sleep吧
+                if(thisisPiaoNotPersonView)
+                    thisSocket = zoominPiaoClientSocket;
+                else thisSocket = personviewClientSocket;
+
+                if(thisSocket == null){  //当前没有可用的连接， 就sleep吧
                     try {
                         Thread.sleep(1000);
+                        System.out.println("当前没有可用的连接， 就sleep吧");
                         continue;
                     }catch (Exception ee ){ee.printStackTrace();}
                 }
 
-
                 try {
-                    InputStream inputStream = zoominPiaoClientSocket.getInputStream();
+                    InputStream inputStream = thisSocket.getInputStream();
                     int bytesRead = inputStream.read(tcpbuffer, 0, tcpbuffer.length);
                     int startIndex = 0;// 100000000;
 //                processNalUnit(tcpbuffer,tcpbuffer.length);
@@ -673,12 +674,12 @@ private void startServerSocket() {
                             // 处理上一个NALU单元, 上一个刚好是完整的一个帧啊
                             if (tobeHandPartImageBuffer_len > 0) {
                                 try {
-                                    decocode_processNalUnit(zoominPiao_Decocode_mediaCodec2, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len);
+                                    decocode_processNalUnit(xDecocode_mediaCodec2, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len);
                                     tobeHandPartImageBuffer_len = 0;
                                 } catch (IllegalStateException e) {
                                     e.printStackTrace();
                                    // releaseEncoder();
-                                    //initStartEncoder();
+                                    // initStartEncoder();
                                 }
 
                             }
@@ -694,7 +695,7 @@ private void startServerSocket() {
                                 //这下又得到一个完整的帧数据啦，赶快处理
                                 if (tobeHandPartImageBuffer_len > 0) {
                                     try{
-                                     decocode_processNalUnit(zoominPiao_Decocode_mediaCodec2,tobeHandPartImageBuffer, tobeHandPartImageBuffer_len);
+                                     decocode_processNalUnit(xDecocode_mediaCodec2,tobeHandPartImageBuffer, tobeHandPartImageBuffer_len);
                                      tobeHandPartImageBuffer_len = 0;
                                     } catch (IllegalStateException e) {
                                         e.printStackTrace();
