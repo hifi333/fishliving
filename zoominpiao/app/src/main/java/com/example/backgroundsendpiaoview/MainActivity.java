@@ -10,6 +10,7 @@ import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CaptureRequest;
+import android.media.MediaCodec;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
 import android.net.Network;
@@ -21,6 +22,7 @@ import com.google.android.material.snackbar.Snackbar;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.IBinder;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -28,6 +30,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -38,6 +41,9 @@ import com.example.backgroundsendpiaoview.databinding.ActivityMainBinding;
 
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.net.wifi.WifiManager;
 
@@ -45,7 +51,11 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -59,9 +69,9 @@ public class MainActivity extends AppCompatActivity {
     private ScaleGestureDetector scaleGestureDetector;
     private float zoomLevel = 1.0f;
 
+    private String SERVER_IP;
 
-    private String localip = "";
-    private String apserverip = "";
+
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -85,10 +95,42 @@ public class MainActivity extends AppCompatActivity {
                 ((ipInt >> 16) & 0xff) + "." +
                 (ipInt >> 24 & 0xff);
     }
+
+    private void udpSend(String message) {
+
+        DatagramSocket socket = null;
+        try {
+            socket = new DatagramSocket();
+            InetAddress serverAddress = InetAddress.getByName(SERVER_IP);
+            byte[] sendData = message.getBytes();
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, 12347);
+            socket.send(sendPacket);
+            // Since System.out.println is not recommended for Android, use Log.d for debugging
+            Log.d("UDP", "Message sent: " + message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        }
+
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+
+
+        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        if (wifiManager.isWifiEnabled()) { //我是client， 我是看漂的， 我必须打开wifi，连接的wifi是热点， 是另外一个抖音直播的手机且打开热点的
+            DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
+            if (dhcpInfo != null) {
+//                localip=  intToIp(dhcpInfo.ipAddress);
+                SERVER_IP=  intToIp(dhcpInfo.serverAddress);
+
+            }
+        }
 
 
         /*
@@ -115,6 +157,130 @@ public class MainActivity extends AppCompatActivity {
 */
 
 
+        // Create a ConstraintLayout as the root layout
+        ConstraintLayout rootLayout = new ConstraintLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+
+        // Create the TextureView
+        TextureView textureView1 = new TextureView(this);
+        textureView1.setId(View.generateViewId());
+        ConstraintLayout.LayoutParams textureViewParams = new ConstraintLayout.LayoutParams(
+                ConstraintLayout.LayoutParams.MATCH_PARENT, 0);
+        textureViewParams.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+        textureViewParams.bottomToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+        textureViewParams.matchConstraintPercentHeight = 0.6f; // 60% of the parent's height
+        textureView1.setLayoutParams(textureViewParams);
+        rootLayout.addView(textureView1);
+
+        // Create the LinearLayout for the bottom part
+        LinearLayout bottomLayout = new LinearLayout(this);
+        bottomLayout.setId(View.generateViewId());
+        bottomLayout.setOrientation(LinearLayout.VERTICAL);
+        ConstraintLayout.LayoutParams bottomLayoutParams = new ConstraintLayout.LayoutParams(
+                ConstraintLayout.LayoutParams.MATCH_PARENT, 0);
+        bottomLayoutParams.topToBottom = textureView1.getId();
+        bottomLayoutParams.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+        bottomLayoutParams.matchConstraintPercentHeight = 0.4f; // 40% of the parent's height
+        bottomLayout.setLayoutParams(bottomLayoutParams);
+        rootLayout.addView(bottomLayout);
+
+
+        Button personView = new Button(this);
+        personView.setText("遛鱼");
+        personView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        bottomLayout.addView(personView);
+
+        Button kanpiao = new Button(this);
+        kanpiao.setText("看漂");
+        kanpiao.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        bottomLayout.addView(kanpiao);
+
+
+
+
+        // Add a Button to the bottom layout
+        Button button1 = new Button(this);
+        button1.setText("Button 1");
+        button1.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        bottomLayout.addView(button1);
+
+        // Add an EditText to the bottom layout
+        EditText editText = new EditText(this);
+        editText.setHint("Enter text here");
+        editText.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        bottomLayout.addView(editText);
+
+        // Set the root layout as the content view
+        setContentView(rootLayout);
+
+
+        // Set the button click listener
+
+        button1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String message = editText.getText().toString();
+                // Network operations should not be done on the UI thread
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        udpSend(message);
+                    }
+                }).start();
+            }
+        });
+
+
+
+        personView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Network operations should not be done on the UI thread
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        udpSend("fishcatching");
+                    }
+                }).start();
+            }
+        });
+
+
+        kanpiao.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Network operations should not be done on the UI thread
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        udpSend("kanpiao");
+                    }
+                }).start();
+            }
+        });
+
+
+
+
+
+
+        /*
+
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -125,6 +291,7 @@ public class MainActivity extends AppCompatActivity {
         textureView1.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         layout.addView(textureView1);
+        */
         textureView1.setSurfaceTextureListener(surfaceTextureListener);
 
 
@@ -320,6 +487,8 @@ public class MainActivity extends AppCompatActivity {
 //            }
 //        }
 //    }
+
+
 
 
 }

@@ -1,0 +1,20 @@
+2024.6.23
+===========
+1.  douyinscreen app (server)
+手机开热点，是服务器， 接收来自zoominpiao app 的视频和 textdraw 内容。 同时接收persionview app来的视频， 但
+同一时刻，只有1个视频会展示。 就是有2个模式： 看漂模式 OR 遛鱼模式
+缺陷：
+douyinscreen app 必需要先启动， 然后才能启动另外2个 client app。 否则远程视频接入异常。  （client视频采集 OK， 传输OK， server 解码OK， server
+展示乱码。 不知道什么原因啊。
+A. 启动 douyinscreen app ,  然后可以反复重启 zoominPIao 都是OK的，  也可以反复重启personView app， 都是OK的。
+B. 如果三个App 都启动来， 工作正常的情况西下， 重启douyinapp,  然后另外2app 会自动重新连接douyinapp, 但此时会出现乱码。  ---- know bug
+
+
+2. zoominpiaoApp (client)
+   --需要这个手机连接到server 的热点网络上， 然后自动发现server 的IP地址， 然后自动向server 建立TCP 连接 with 固定的port：12345
+   --向server 发送UDP command， 切换模式： 看漂模式 OR 遛鱼模式， 或者发送展示在douyinscreen 上的文字
+
+3. personViewAPP (client)
+   需要这个手机连接到server 的热点网络上， 然后自动发现server 的IP地址， 然后自动向server 建立TCP 连接 with 固定的port：12346
+
+

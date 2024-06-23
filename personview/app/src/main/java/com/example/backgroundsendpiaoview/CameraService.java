@@ -262,6 +262,7 @@ public class CameraService extends Service {
 
                         } catch (Exception e) {
                             // zoompiaosocket 发送过程异常
+                            System.out.println("------------这个连接发送异常，,休息3s 重新再连接");
                             zoompiaosocket  = null;
                         }
                     } //loop for this  connection
@@ -270,18 +271,14 @@ public class CameraService extends Service {
                     e.printStackTrace();
                     //连接服务器失败： 为了简单请先启动开热点按个手机上的app2， 再来启动这个app1
                     //连接失败里， 休息20秒，再次重新连接把。
-                    try {
-                        // 让当前线程暂停20秒
-                        Thread.sleep(20000);
-                    } catch (InterruptedException e2) {
-                        e2.printStackTrace();
-                        // 线程被中断时的处理代码
-                    }
+
+                    System.out.println("------------连接服务器失败,休息3s 重新再连接");
+
                 }
 
                 try {
                     // 让当前线程暂停20秒
-                    Thread.sleep(20000);
+                    Thread.sleep(3000);
                 } catch (InterruptedException e2) {
                     e2.printStackTrace();
                     // 线程被中断时的处理代码

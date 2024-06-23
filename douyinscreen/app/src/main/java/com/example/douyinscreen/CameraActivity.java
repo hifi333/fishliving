@@ -33,11 +33,16 @@ import androidx.core.app.ActivityCompat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class CameraActivity extends AppCompatActivity {
 
@@ -50,12 +55,14 @@ public class CameraActivity extends AppCompatActivity {
     private CameraCaptureSession cameraCaptureSession;
 
 
+
 //    private TextureView textureView;
     private Handler mBackgroundHandler;
     private Socket socket;
     private TextureView bigbackgroundView;
     private TextureView zoominPIaoView;
     private TextureView personView;
+    private CustomTextDrawView textDrawView;
     private ServerSocket serverSocket;
     private boolean ZoominPiao_isRunning = true;
 
@@ -69,13 +76,44 @@ public class CameraActivity extends AppCompatActivity {
     private int lastTouchX, lastTouchY;
     private FrameLayout.LayoutParams zoominPiaoViewParams;
     private boolean tozoominflag = true;
+    private boolean currentis_fishcatchingModel = false;
 
     private Paint paint;
     private String text = "Hello, World!";
 
+
+    private Socket zoominPiaoClientSocket = null;
+    private Socket personviewClientSocket = null;
+    private Socket DrawTextClientSocket = null;
+
+    Surface surfaceVideo_person =null; //这个很重要，是从对应View的渲染后的callback（会多次发生） 函数中获取更新的， 这个要关联到解码器上的
+    Surface surfaceVideo_zoominpiao =null;
+
+//    private Timer timer;
+//    private TimerTask timerTask;
+//
+//    private void startTimer() {
+//        timer = new Timer();
+//        timerTask = new TimerTask() {
+//            @Override
+//            public void run() {
+//                Log.d(TAG, "Hello, this is printed every 10 seconds!");
+//                setGUIfishCatching(isfishcatching);
+//                isfishcatching = !isfishcatching;
+//            }
+//        };
+//        timer.schedule(timerTask, 0, 30000);
+//    }
+//    private void stopTimer() {
+//        if (timer != null) {
+//            timer.cancel();
+//            timer = null;
+//        }
+//    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
 //
         /*
         LinearLayout layout = new LinearLayout(this);
@@ -120,24 +158,24 @@ public class CameraActivity extends AppCompatActivity {
         rootLayout.addView(zoominPIaoView, zoominPiaoViewParams);
 
         // 创建CustomView并添加到FrameLayout
-        CustomTextDrawView customView = new CustomTextDrawView(this);
-        customView.setLayoutParams(new FrameLayout.LayoutParams(
+         textDrawView = new CustomTextDrawView(this);
+        textDrawView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER));
-        customView.bringToFront(); // 将CustomView置于TextureView之上
-        rootLayout.addView(customView);
+        textDrawView.bringToFront(); // 将CustomView置于TextureView之上
+        rootLayout.addView(textDrawView);
 
 
         //创建一个临时浮动的80% 全屏且在最上面的一个View，展示抓鱼时刻的第一视觉的摄像头（挂在脖子下面那个）
         personView = new TextureView(this);
-        FrameLayout.LayoutParams a1  = new FrameLayout.LayoutParams(
-                800,
-                800
-        );
-        a1.leftMargin = 100;
-        a1.topMargin = 500;
-        rootLayout.addView(personView, a1);
+
+        personView.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER));
+
+        rootLayout.addView(personView);
 
 //
 //        FrameLayout.LayoutParams paramsTextureView3 = new FrameLayout.LayoutParams(
@@ -162,6 +200,11 @@ public class CameraActivity extends AppCompatActivity {
 
         zoominPIaoView.setSurfaceTextureListener(surfaceTextureListener_zoominpiao);
         personView.setSurfaceTextureListener(surfaceTextureListener_personview);
+
+//        personView.setSurfaceTextureListener(surfaceTextureListener_zoominpiao);
+//        zoominPIaoView.setSurfaceTextureListener(surfaceTextureListener_personview);
+
+
         bigbackgroundView.setSurfaceTextureListener(surfaceTextureListener_bigbackground);
 
 
@@ -169,10 +212,50 @@ public class CameraActivity extends AppCompatActivity {
         scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
         gestureDetector = new GestureDetector(this, new GestureListener());
 
+//        setGUIfishCatching(true);
 
         startBackgroundThread();
+        start_DrawText_ServerSocket();
+
+//
+//        bigbackgroundView.setVisibility(View.INVISIBLE);
+//        zoominPIaoView.setVisibility(View.INVISIBLE);
+//
+//        personView.setLayoutParams(new FrameLayout.LayoutParams(
+//                FrameLayout.LayoutParams.MATCH_PARENT,
+//                FrameLayout.LayoutParams.MATCH_PARENT,
+//                Gravity.CENTER));
+//        personView.bringToFront();
+
     }
 
+    private void setGUIfishCatching(boolean isCatching){
+
+        currentis_fishcatchingModel = isCatching;
+
+        if(isCatching && personviewClientSocket!=null) {
+            bigbackgroundView.setVisibility(View.INVISIBLE);
+            zoominPIaoView.setVisibility(View.INVISIBLE);
+            textDrawView.setVisibility(View.INVISIBLE);
+
+
+            personView.setVisibility(View.VISIBLE); //可见
+            personView.bringToFront(); //前面
+        }else {
+            personView.setVisibility(View.INVISIBLE);
+
+            bigbackgroundView.setVisibility(View.VISIBLE); //可见
+            zoominPIaoView.setVisibility(View.VISIBLE); //可见
+            textDrawView.setVisibility(View.VISIBLE); //可见
+
+            bigbackgroundView.bringToFront(); //前面
+            zoominPIaoView.bringToFront(); //前面
+            textDrawView.bringToFront();
+
+
+        }
+
+    }
 
     private class GestureListener extends GestureDetector.SimpleOnGestureListener {
         @Override
@@ -252,11 +335,27 @@ public class CameraActivity extends AppCompatActivity {
 
 
     private TextureView.SurfaceTextureListener surfaceTextureListener_personview = new TextureView.SurfaceTextureListener() {
-        @Override
+
+        //1When a TextureView is added to the view hierarchy and becomes visible
+        //2device screen rotation
+        //3When an activity is resumed, and the TextureView was previously paused or stopped, the SurfaceTexture becomes available again
+        //Setting a TextureView to View.INVISIBLE and then back to View.VISIBLE does not trigger the onSurfaceTextureAvailable callback.
+        @Override //这个函数的特效，如果当前View，被隐藏了，就不会触发这个函数，
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
             try {
                 ////远程来的数据，解码器后，绑定到这个view
-                start_personview_ServerSocket( new Surface(surface));
+                System.out.println("++++++++personView 又展示出来了，这个函数的特效，如果当前View，被隐藏了，就不会触发这个函数");
+                //这个触发函数可能被多次触发， so不能在这里初始化服务器， 只能这里更新最新的Surface 给解码器。
+                //只能初始化一次啊：
+
+                Surface aa  = new Surface(surface);
+
+                if(surfaceVideo_person == null) { //确保只初始化1次。
+                    surfaceVideo_person = aa;
+                    start_personview_ServerSocket(surfaceVideo_person);
+                }else{
+                    surfaceVideo_person = aa; //及时保持这个更新，方便后面的解码器也跟新这个关联
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -281,7 +380,17 @@ public class CameraActivity extends AppCompatActivity {
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
             try {
                 ////远程来的数据，解码器后，绑定到这个view
-                start_ZoominPiao_ServerSocket(new Surface(surface));
+                System.out.println("++++++++zoominPiaoView 又展示出来了，这个函数的特效，如果当前View，被隐藏了，就不会触发这个函数");
+
+                Surface aa  = new Surface(surface);
+
+                if(surfaceVideo_zoominpiao == null) { //确保只初始化1次。
+                    surfaceVideo_zoominpiao = aa;
+                    start_ZoominPiao_ServerSocket(surfaceVideo_zoominpiao);
+                }else{
+                    surfaceVideo_zoominpiao = aa; //及时保持这个更新，方便后面的解码器也跟新这个关联
+                }
+
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -512,7 +621,7 @@ public class CameraActivity extends AppCompatActivity {
 
 private void start_ZoominPiao_ServerSocket(Surface surface) {
 
-    new ZoominPiao_ClientHandler(surface,true).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
+    new Decode_thread_ClientHandler(surface,true).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
     //整个线程里初始化私有的解码器，避免解码器遇到多线程问题。 另外从解码器里申请一个InputbufferIndex，
     // dequeueInputBuffer（放收到的视频数据进去），此时需要设定timeout时间，可以避免线程block住导致画面block住
     //整个线程应该长期运行在：  at java.net.SocketInputStream.read
@@ -531,14 +640,11 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
 
     private void start_personview_ServerSocket(Surface surface) {
 
-        new ZoominPiao_ClientHandler(surface,false).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
+        new Decode_thread_ClientHandler(surface,false).start(); //整个app，固定一个线程来处理接收数据，和解码数据到View
         //整个线程里初始化私有的解码器，避免解码器遇到多线程问题。 另外从解码器里申请一个InputbufferIndex，
         // dequeueInputBuffer（放收到的视频数据进去），此时需要设定timeout时间，可以避免线程block住导致画面block住
         //整个线程应该长期运行在：  at java.net.SocketInputStream.read
 
-        try {
-            Thread.sleep(2000);
-        }catch (Exception ee) {ee.printStackTrace();}
 
         //启动这个线程， 持续的监听这个端口，等待一个特定的业务client，就是放大漂的视频数据，
         //用线程来监听，而不是一次性的， 是为了放大漂的client 会启动/关闭，重复连接。
@@ -547,9 +653,72 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
 
     }
 
+    private void start_DrawText_ServerSocket() {
 
-    private Socket zoominPiaoClientSocket = null;
-    private Socket personviewClientSocket = null;
+        //启动这个线程， 持续的监听这个端口，等待一个特定的业务client，就是放大漂的视频数据，
+        //用线程来监听，而不是一次性的， 是为了放大漂的client 会启动/关闭，重复连接。
+        new Thread(new DrawText_ServerRunnable()).start(); //一个接收TCP端口为12345对应zoominpiao的client 的连接线程。收到连接就交给别人处理，
+
+
+    }
+
+
+    //UDP server
+    private class DrawText_ServerRunnable implements Runnable {
+        private int thisserverport =12347;
+
+        @Override
+        public void run() {
+            try  {
+                DatagramSocket  socket = new DatagramSocket(thisserverport);
+                Log.d(TAG, "UDP Server started on port " + thisserverport);
+                while (true) {
+                    try {
+                        byte[] buffer = new byte[1024];
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(packet);
+                        String message = new String(packet.getData(), 0, packet.getLength());
+                        Log.d(TAG, "Received: " + message);
+
+                        //处理发来的指令，更新当前douyinScreen
+                        if(message.equalsIgnoreCase("fishcatching")){
+
+                            //临时切换以下屏幕
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    setGUIfishCatching(true);
+                                }
+                            });
+                            //end
+
+                        }else  if(message.equalsIgnoreCase("kanpiao")){
+
+                            //临时切换以下屏幕
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    setGUIfishCatching(false);
+                                }
+                            });
+                            //end
+                        }else {
+
+                            textDrawView.showtextlist[0] = message;
+                            textDrawView.invalidate();
+
+                        }
+
+
+                    }catch (Exception eee) {eee.printStackTrace();}
+
+                }
+            } catch (IOException ex) {
+                Log.e(TAG, "Server exception: " + ex.getMessage(), ex);
+            }
+        }
+    }
+
     private class ZoominPiao_ServerRunnable implements Runnable {
         private int thisserverport =12345;
 
@@ -573,12 +742,19 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
 
         @Override
         public void run() {
+            try {
+                Thread.sleep(2000);
+            }catch (Exception ee) {ee.printStackTrace();}
+
             try (ServerSocket serverSocket = new ServerSocket(thisserverport)) {
-                System.out.println("Server startup with port:" + thisserverport);
+                System.out.println("personserver startup with port:" + thisserverport);
                 while (true) {
                     Socket socket = serverSocket.accept();
                     personviewClientSocket = socket;
-                    Log.d(TAG, "persionview New client connected for : " + thisserverport);
+
+
+
+                    Log.d(TAG, "personserver New client connected for : " + thisserverport);
                 }
             } catch (IOException ex) {
                 Log.e(TAG, "Server exception: " + ex.getMessage(), ex);
@@ -586,7 +762,36 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
         }
     }
 
-    private class ZoominPiao_ClientHandler extends Thread {
+//
+//    private class DrawText_ClientHandler extends Thread {
+//
+//        public void run() {
+//            byte[] tcpbuffer = new byte[65536];
+//            while (true) {
+//
+//                if(DrawTextClientSocket == null){  //当前没有可用的连接， 就sleep吧
+//                    try {
+//                        Thread.sleep(1000);
+////                        System.out.println("当前没有可用的连接， 就sleep吧");
+//                        continue;
+//                    }catch (Exception ee ){ee.printStackTrace();}
+//                }
+//
+//                try {
+//                    InputStream inputStream = DrawTextClientSocket.getInputStream();
+//                    int bytesRead = inputStream.read(tcpbuffer, 0, tcpbuffer.length);
+//                    String receivedString = new String(tcpbuffer, 0, bytesRead, StandardCharsets.UTF_8);
+//                    System.out.println("++++++++++++++++" +receivedString);
+//
+//                }catch (Exception ee) {ee.printStackTrace();}
+//
+//
+//
+//            }
+//        }
+//    }
+
+        private class Decode_thread_ClientHandler extends Thread {
         private MediaCodec xDecocode_mediaCodec2;
         private Surface thisSurfaceTexture;
         private boolean thisisPiaoNotPersonView = true;
@@ -605,6 +810,7 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
                 if(thisSurfaceTexture==null) {
                     System.out.println("zoominPiao_surfaceTexture is null");
                 }
+                //thisSurfaceTexture 如果该app发生生命周期的暂停/继续，这个对象会改变的，需要及时更新/关联到这个解码器上
                 xDecocode_mediaCodec2.configure(format, thisSurfaceTexture, null, 0);
                 xDecocode_mediaCodec2.start(); //需要在同一个线程里，初始化，和后面的日常使用。
 
@@ -631,7 +837,7 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
                 System.out.println("in releaseEncoder");
             }
         }
-        public ZoominPiao_ClientHandler(Surface surfaceTexture,boolean isPiaoNotPersonView) {
+        public Decode_thread_ClientHandler(Surface surfaceTexture,boolean isPiaoNotPersonView) {
             thisisPiaoNotPersonView = isPiaoNotPersonView;
             thisSurfaceTexture = surfaceTexture;
             this.setName("fish_ZoominPiao_ClientHandler");
@@ -644,7 +850,7 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
         public void run() {
             byte[] tcpbuffer = new byte[65536]; //65K空间,且这个不能很大，网卡接收不住，存储不下1帧的图像数据（400KB 到 5M）， 所以每次读取的数据只能是一帧的部分数据啊。 且里面最多有N帧数据， N-2个帧的完整数据，头尾都是帧的部分数据 也就是说里面包括n-2个帧的开头标记！
             byte[] tobeHandPartImageBuffer = new byte[6553600];//6.5M, 大于 一帧的数据上限要求. 存储在本地的一帧数据的部分，等凑满一帧后，才处理。 啥时候凑满呢，答： 遇到下一帧的开头标记
-            int tobeHandPartImageBuffer_len = 0;
+            int    tobeHandPartImageBuffer_len = 0; //为了从tcp的流中，切割到一个完整的帧，这个帧的长度。
             Socket thisSocket = null;
 
             int framestartflaglen= 8;
@@ -652,45 +858,69 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
 
                 if(thisisPiaoNotPersonView)
                     thisSocket = zoominPiaoClientSocket;
-                else thisSocket = personviewClientSocket;
+                else
+                    thisSocket = personviewClientSocket;
+
+                if(currentis_fishcatchingModel && thisisPiaoNotPersonView) {
+                    try {
+                        Thread.sleep(2*1000);
+                    }catch (Exception ee ){ee.printStackTrace();}
+
+                    continue; //不处理啊， 因为piaoView 当前是隐藏的哦。 处理也是浪费cpu时间
+
+                }else  if(!currentis_fishcatchingModel && !thisisPiaoNotPersonView) {
+                    try {
+                        Thread.sleep(2*1000);
+                    }catch (Exception ee ){ee.printStackTrace();}
+
+                    continue; //不处理啊，
+                }
+
+
 
                 if(thisSocket == null){  //当前没有可用的连接， 就sleep吧
                     try {
-                        Thread.sleep(1000);
-                        System.out.println("当前没有可用的连接， 就sleep吧");
-                        continue;
+                        System.out.println("当前线程看漂：" + thisisPiaoNotPersonView + "  socket == null, sleep 等待连接");
+                        Thread.sleep(2*1000);
                     }catch (Exception ee ){ee.printStackTrace();}
+
+                    continue;
+
                 }
 
                 try {
                     InputStream inputStream = thisSocket.getInputStream();
                     int bytesRead = inputStream.read(tcpbuffer, 0, tcpbuffer.length);
-                    int startIndex = 0;// 100000000;
-//                processNalUnit(tcpbuffer,tcpbuffer.length);
-                    while (startIndex < bytesRead) { ////从绳子上剪到一批数据啦
+
+                    //System.out.println("当前线程看漂：" + thisisPiaoNotPersonView + "  读取到数据：" + bytesRead);
+
+
+                    int streamSearchIndex = 0;// 100000000, 当前这次tcp流的遍历index
+
+                    while (streamSearchIndex < bytesRead) { ////从绳子上剪到一批数据啦
                         // 查找NALU起始码
-                        int naluStartIndex = findNalUnitStartCode(tcpbuffer, startIndex, bytesRead);
+                        int naluStartIndex = findNalUnitStartCode(tcpbuffer, streamSearchIndex, bytesRead);
                         if (naluStartIndex == 0) {
-                            // 处理上一个NALU单元, 上一个刚好是完整的一个帧啊
+                            // 刚好本次流的开始就是一帧的开始， 那么也是上一个帧的结尾。 我们看看我们剪下来的上一帧缓存是否在，要是在，就处理上一个NALU单元, 上一个刚好是完整的一个帧啊
                             if (tobeHandPartImageBuffer_len > 0) {
                                 try {
                                     decocode_processNalUnit(xDecocode_mediaCodec2, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len);
-                                    tobeHandPartImageBuffer_len = 0;
+                                    tobeHandPartImageBuffer_len = 0; //帧缓存reset
                                 } catch (IllegalStateException e) {
                                     e.printStackTrace();
-                                   // releaseEncoder();
+                                    // releaseEncoder();
                                     // initStartEncoder();
                                 }
 
                             }
                             //这个标记后面的数据要继续分析啊，其中有可能还是包含framestart 标记啊
-                            startIndex = naluStartIndex + framestartflaglen; //往后继续推进，跳过这个标记啊
+                            streamSearchIndex = naluStartIndex + framestartflaglen; //往后继续推进，跳过这个标记啊
 
                         }else if (naluStartIndex > 0) {
                             // 将起始码之前的数据复制到NALU缓冲区
-                            int length = naluStartIndex - startIndex;
+                            int length = naluStartIndex - streamSearchIndex;
                             if (length > 0) {
-                                System.arraycopy(tcpbuffer, startIndex, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len, length);
+                                System.arraycopy(tcpbuffer, streamSearchIndex, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len, length);
                                 tobeHandPartImageBuffer_len += length;
                                 //这下又得到一个完整的帧数据啦，赶快处理
                                 if (tobeHandPartImageBuffer_len > 0) {
@@ -703,29 +933,31 @@ private void start_ZoominPiao_ServerSocket(Surface surface) {
                                         //initStartEncoder();
                                     }
 
-                            }
+                                }
                             }
 
                             // 这个标记后面的数据要继续分析啊，其中有可能还是包含framestart 标记啊
-                            startIndex = naluStartIndex + framestartflaglen; //往后继续推进，跳过这个标记啊
-
-
+                            streamSearchIndex = naluStartIndex + framestartflaglen; //往后继续推进，跳过这个标记啊
                         } else {
                             // 本次剪刀剪出的内容里，没有找到一个完整的帧标记啊， 看来这个数据是上一个帧的部分body内容里，把这个数据复制到NALU缓冲区
-                            int length = bytesRead - startIndex;
+                            int length = bytesRead - streamSearchIndex;
                             if (length > 0) {
-                                System.arraycopy(tcpbuffer, startIndex, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len, length);
+                                System.arraycopy(tcpbuffer, streamSearchIndex, tobeHandPartImageBuffer, tobeHandPartImageBuffer_len, length);
                                 tobeHandPartImageBuffer_len += length;
                             }
-                            startIndex = bytesRead; //退出本次剪刀剪出的数据的处理
+                            streamSearchIndex = bytesRead; //退出本次剪刀剪出的数据的处理
                         }
-                    }
+                    } //继续循环分析这次socket 读取数据数组。。
+
+
                 }catch (IOException e) {
                     e.printStackTrace();  //如果直播过程中，网络问题，该client 连接问题出现，这里就异常，然后这个线程结束，
-                    System.out.println("fish: 当前这个zoominpiaoclient 读取异常，让对应的client 处理线程退出");
+                    System.out.println("fish: 当前这个zoominpiaoclient 读取异常，让对应的处理线程退出");
 //                    isrunning = false; //连接中断， 这个线程就退出运行把。
-                    zoominPiaoClientSocket = null;
-                }
+                    if(thisisPiaoNotPersonView)
+                         zoominPiaoClientSocket = null;
+                    else
+                         personviewClientSocket = null;                }
 
             } //while(true)
 

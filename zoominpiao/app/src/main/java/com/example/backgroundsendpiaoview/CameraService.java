@@ -22,6 +22,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.util.Log;
 import android.util.Size;
 import android.view.GestureDetector;
 import android.view.ScaleGestureDetector;
@@ -34,6 +35,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -220,72 +222,105 @@ public class CameraService extends Service {
         }
     }
 
+    Socket zoompiaosocket = null;
+
+    private class Server_connection_Runnable extends Thread {
+
+        @Override
+        public void run() {
+            while(true) {
+                try {
+                    Thread.sleep(2000);
+                } catch (Exception ee) {
+                    ee.printStackTrace();
+                }
+
+                if (zoompiaosocket == null) {
+                    try { //发起新连接
+                        zoompiaosocket = new Socket(SERVER_IP, SERVER_PORT); //TCP 发送的， 每次发送的数据不丢，且多次发送的都是管道一样，保持顺序的
+                        System.out.println("fish重新连接服务器成功！");
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        try {
+                            if (zoompiaosocket != null) {
+                                zoompiaosocket.close();
+                            }
+                        } catch (Exception e1) {
+                            e1.printStackTrace();
+                        }
+                        //连接服务器失败： 为了简单请先启动开热点按个手机上的app2， 再来启动这个app1
+                        System.out.println("fish连接失败里， 休息2秒，再次重新连接把");
+
+                    }
+
+                }
+            }
+        }
+    }
 
 
     private class ClientHandler extends Thread {
+
+        boolean fuck= true;
 
         public ClientHandler() {
         }
 
         public void run() {
             while (true) {
-                try { //发起新连接
-                    Socket zoompiaosocket = new Socket(SERVER_IP, SERVER_PORT); //TCP 发送的， 每次发送的数据不丢，且多次发送的都是管道一样，保持顺序的
-                    while (zoompiaosocket!=null) { //持续从本地摄像头（编码器里）读取数据，zoompiaosocket 发送出去
-                        try {
-                            // 使用 bufferInfo.size 来确定缓冲区中有效数据的大小
-                            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo(); //一帧的缓冲区数据buffer，关键帧全量数据，其他长尾帧是变化的部分数据
-                            int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 10000); // 从解码器里获取一个帧，找到最新的一个帧的硬件缓存区的编号
-
-                            if (outputBufferIndex >= 0) { //拿到有效的一帧数据
-                                ByteBuffer outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex); //取出这个帧的缓冲区
-                                byte[] buffer = new byte[bufferInfo.size]; //准备数据块，来存储帧数据
-                                // System.out.println("数据帧大小:" + bufferInfo.size);
-                                outputBuffer.get(buffer); //帧的数据大小为bufferInfo.size
-                                //数据帧大小:158732
-                                //数据帧大小:421421 421kb,不到1M
-                                outputBuffer.clear();
-
-                                zoompiaosocket.getOutputStream().write(new byte[]{0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04}); // 这是我自己定的，几个数字。添加NALU起始码，有利于从流中分析出实际后面的帧数据块
-                                zoompiaosocket.getOutputStream().write(buffer); //TCP 数据流发送出去，特定是顺序，不丢。。 但每次服务器读取的位置不确定的，类似一个绳子每次剪刀剪的地方不确定
-
-                                //开始模拟不发送出去，本地的另外一个解码器消费，且在下面的展示出来。
-                                //buffer 里到底放里多个字节呢？ 答案：bufferInfo.size
-//                                    byte[] copy = new byte[buffer.length];
-//                                    System.arraycopy(buffer, 0, copy, 0, buffer.length);
-//                                    decode2localpreview(copy.length,copy); //这个是多此一举， 估计是浪费计算力，后面再优化把。
-//                                    decode2localpreview(bufferInfo.size,buffer); //这个是多此一举， 估计是浪费计算力，后面再优化把。
-
-
-                                mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-                            }
-
-                        } catch (Exception e) {
-                            // zoompiaosocket 发送过程异常
-                            zoompiaosocket  = null;
-                        }
-                    } //loop for this  connection
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    //连接服务器失败： 为了简单请先启动开热点按个手机上的app2， 再来启动这个app1
-                    //连接失败里， 休息20秒，再次重新连接把。
+                if(zoompiaosocket == null) {
                     try {
                         // 让当前线程暂停20秒
-                        Thread.sleep(20000);
+                        Thread.sleep(1000 * 2);
                     } catch (InterruptedException e2) {
                         e2.printStackTrace();
                         // 线程被中断时的处理代码
                     }
                 }
 
-                try {
-                    // 让当前线程暂停20秒
-                    Thread.sleep(20000);
-                } catch (InterruptedException e2) {
-                    e2.printStackTrace();
-                    // 线程被中断时的处理代码
-                }
+                //连接成功了，开始工作。
+                while (zoompiaosocket !=null) { //持续从本地摄像头（编码器里）读取数据，zoompiaosocket 发送出去
+                    try {
+                        // 使用 bufferInfo.size 来确定缓冲区中有效数据的大小
+                        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo(); //一帧的缓冲区数据buffer，关键帧全量数据，其他长尾帧是变化的部分数据
+                        int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 1000); // 从解码器里获取一个帧，找到最新的一个帧的硬件缓存区的编号
+
+                        if (outputBufferIndex >= 0) { //拿到有效的一帧数据
+                            ByteBuffer outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex); //取出这个帧的缓冲区
+                            byte[] buffer = new byte[bufferInfo.size]; //准备数据块，来存储帧数据
+                            // System.out.println("数据帧大小:" + bufferInfo.size);
+                            outputBuffer.get(buffer); //把当前摄像头里对应的编码器里一帧的数据，copy 出来到buffer里。
+                            //数据帧大小:158732
+                            //数据帧大小:421421 421kb,不到1M
+                            outputBuffer.clear();
+
+                            zoompiaosocket.getOutputStream().write(new byte[]{0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04}); // 这是我自己定的，几个数字。添加NALU起始码，有利于从流中分析出实际后面的帧数据块
+                            zoompiaosocket.getOutputStream().write(buffer); //TCP 数据流发送出去，特定是顺序，不丢。。 但每次服务器读取的位置不确定的，类似一个绳子每次剪刀剪的地方不确定
+
+//                            System.out.println("fish发送数据:" + "8");
+//                            System.out.println("fish发送数据:" + bufferInfo.size);
+                            //释放buffer，
+
+                            //开始模拟不发送出去，本地的另外一个解码器消费，且在下面的展示出来。
+                            //buffer 里到底放里多个字节呢？ 答案：bufferInfo.size
+//                                    byte[] copy = new byte[buffer.length];
+//                                    System.arraycopy(buffer, 0, copy, 0, buffer.length);
+//                                    decode2localpreview(copy.length,copy); //这个是多此一举， 估计是浪费计算力，后面再优化把。
+//                                    decode2localpreview(bufferInfo.size,buffer); //这个是多此一举， 估计是浪费计算力，后面再优化把。
+
+
+                            mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
+                        }
+
+                    } catch (Exception e) {
+                        // zoompiaosocket 发送过程异常
+                        System.out.println("fish发送异常，重新连接");
+
+                        zoompiaosocket  = null; //跳出while，进入顶层while 等待新的连接。
+                        fuck = false;
+                    }
+                } //loop for this good connection
 
             }//用这个新的socket tcp 连接工作，期间异常后， 会在这个loop 里重新建立新的连接。        }
         }
@@ -295,6 +330,7 @@ public class CameraService extends Service {
 
     private void startSocketThread() {
 
+        new Server_connection_Runnable().start();
         new ClientHandler().start();
 
     }
