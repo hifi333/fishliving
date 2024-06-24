@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.baidu.aip.asrwakeup3">
+
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+
+    <application
+            android:allowBackup="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="看漂看漂"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:theme="@style/AppTheme"
+            android:extractNativeLibs="true"
+    >
+        <service android:name=".FishCameraService"
+            android:foregroundServiceType="camera|microphone"/>
+
+
+        <activity android:name=".ActivityMain"  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+<!--        <activity-->
+<!--            android:exported="true"-->
+<!--            android:name=".wakeup.ActivityWakeUp"-->
+<!--            android:configChanges="orientation|keyboardHidden|screenLayout"-->
+<!--            android:label="唤醒词"-->
+<!--            android:screenOrientation="portrait">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN"/>-->
+<!--                <category android:name="android.intent.category.LAUNCHER"/>-->
+<!--            </intent-filter>-->
+<!--        </activity>-->
+
+        <activity
+            android:exported="true"
+                android:name=".recog.ActivityOnlineRecog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="在线识别"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+        <activity
+            android:exported="true"
+                android:name=".recog.ActivityOfflineRecog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="离线命令词"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+        <activity
+            android:exported="true"
+                android:name=".recog.ActivityNlu"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="在线和本地语义"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:exported="true"
+                android:name=".recog.ActivityAllRecog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="全部识别"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:exported="true"
+                android:name=".recog.ActivityUiDialog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="在线识别（带对话框界面）"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+        <activity
+            android:exported="true"
+                android:name=".mini.ActivityMyMiniRecog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="精简版识别"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+
+
+        <activity
+            android:exported="true"
+                android:name=".wakeup.ActivityWakeUpRecog"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="唤醒后识别"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+        <activity
+            android:exported="true"
+                android:name=".mini.ActivityMyMiniWakeUp"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="精简版唤醒"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+        <activity
+            android:exported="true"
+                android:name=".mini.ActivityMyMiniUnit"
+                android:configChanges="orientation|keyboardHidden|screenLayout"
+                android:label="精简版语义解析UNIT"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category
+                        android:name="com.baidu.speech.recognizerdemo.intent.category.SAMPLE_CODE"/>
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>
